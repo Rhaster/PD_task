@@ -19,8 +19,8 @@ NPC_SYSTEM = (
 
 
 NPC_USER_TEMPLATE = (
-    "CONTEXT:\n{context}\n\nUSER_REQUEST:\n{prompt}\n\nCONSTRAINTS:\n{constraints}\n\n"
-    "AVOID_NAMES:\n{avoid}\n\nReturn ONLY JSON array."
+    "CONTEXT:\n{context}\n\nUSER_REQUEST:\n{prompt}\n\n"
+    "AVOID_NAMES:\n\nReturn ONLY JSON array."
 )
 
 

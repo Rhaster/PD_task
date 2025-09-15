@@ -1,26 +1,28 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+
 from Config.config import settings
+from pymongo import MongoClient
 
 
-_client: AsyncIOMotorClient | None = None
+
+# --- konfiguracja MongoDB ---
+mongo = MongoClient("mongodb://localhost:27017/")
+db = mongo["npc_system_db"]
+sessions = db["chat_sessions"]
+npc_collection = db["npcs"]
 
 
-def get_client() -> AsyncIOMotorClient:
-    global _client
-    if _client is None:
-        _client = AsyncIOMotorClient(settings.mongo_uri)
-    return _client
+
+from bson import ObjectId
+
+def save_npcs_to_mongo(npcs: list[dict]) -> list[str]:
+    if not npcs:
+        return []
+    print(f"Saving {len(npcs)} NPCs to MongoDB")
+    result = npc_collection.insert_many(npcs)
+    return [str(_id) for _id in result.inserted_ids]
 
 
-async def get_db():
-    return get_client()[settings.mongo_db]
+def existing_names() -> list[str]:
+    return [doc["name"] for doc in npc_collection.find({}, {"_id": 0, "name": 1})]
 
 
-async def ensure_indexes(db):
-    await db["npcs"].create_index("name", unique=True)
-    await db["npcs"].create_index([("personality", 1), ("mood", 1)])
-    await db["npcs"].create_index("knowledge_tags") # multikey
-    await db["npcs"].create_index("updated_at")
-
-
-    await db["interactions"].create_index([("npc_id", 1), ("timestamp", -1)])

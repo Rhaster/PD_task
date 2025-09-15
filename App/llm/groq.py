@@ -16,6 +16,7 @@ class GroqClient:  # Definicja klasy GroqClient, która jest opakowaniem dla kli
             max_tokens=kwargs.get("max_tokens", 512),  # Ustawia maksymalną liczbę tokenów (domyślnie 512)
             stream=False  # Wyłącza strumieniowanie odpowiedzi
         )
+        print(response)  # Debug: drukuje odpowiedź z API Groq
         return response  # Zwraca odpowiedź z API Groq
 
 

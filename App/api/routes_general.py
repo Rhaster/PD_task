@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from services.general_pipeline import GeneralPipeline
 from core.rag import FaissRAG
@@ -16,4 +16,8 @@ class QARequest(BaseModel):
 
 @router.post("/qa")
 def story_qa(req: QARequest):
-    return _pipeline.answer(req.question)
+    try:
+        return _pipeline.process(req.question)
+    except Exception as e:
+        print(f"Error in QA endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Internal error while processing your request.")

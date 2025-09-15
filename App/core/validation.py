@@ -2,8 +2,6 @@
 from Models.models import NPC
 
 
-
-
 def validate_npcs(npcs: list[dict]) -> list[dict]:
     out: list[dict] = []
     for n in npcs:

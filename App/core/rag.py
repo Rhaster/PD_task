@@ -5,7 +5,7 @@ from core.embeddings_local import embed_texts
 
 CHUNK_PREFIX = "chunk_"
 from pathlib import Path
-BASE_DIR = Path(__file__).resolve().parents[2]  # katalog projektu (dostosuj w razie innej struktury)
+BASE_DIR = Path(__file__).resolve().parents[2]  
 print("BASE_DIR", BASE_DIR)
 DEFAULT_INDEX = BASE_DIR / "App" / "Data" / "index.faiss"
 

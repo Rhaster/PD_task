@@ -6,11 +6,8 @@ from groq import Groq
 from pymongo import MongoClient
 from datetime import datetime
 import json, time
+from db.database import sessions
 
-# --- konfiguracja MongoDB ---
-mongo = MongoClient("mongodb://localhost:27017/")
-db = mongo["npc_system"]
-sessions = db["chat_sessions"]
 # 1) wczytaj .env (jeśli istnieje)
 try:
     from dotenv import load_dotenv, find_dotenv
@@ -36,10 +33,8 @@ def _get_env_key() -> Optional[str]:
     return key or None
 
 CHAT_MODEL = os.getenv("CHAT_MODEL", "openai/gpt-oss-20b")
-
 class LLMError(RuntimeError):
     pass
-
 _client: Optional[Groq] = None
 _api_key_cache: Optional[str] = None
 
@@ -54,9 +49,7 @@ def _get_client() -> Groq:
         where = f".env: {_env_path}" if _env_path else "(.env nie znaleziono)"
         tried = "GROQ_API_KEY / GROQ_APIKEY / GROQ_TOKEN / GROQ_KEY"
         raise LLMError(
-            f"Brak klucza Groq. Sprawdź {where} i zmienne: {tried}.\n"
-            f"Przykład wpisu w .env:\nGROQ_API_KEY=sk-...twoj_klucz...\n"
-            f"W PowerShell możesz ustawić tymczasowo: $env:GROQ_API_KEY='sk-...'"
+            f"Missing Groq API key in env ({where})"
         )
 
     _api_key_cache = api_key
