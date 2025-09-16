@@ -1,24 +1,39 @@
+# docker-compose.yaml
 services:
-  app:
-    build: .
-    container_name: fastapi-app
+  api:
+    build:
+      context: .
+      dockerfile: .dockerfile   
+    image: foregamer/api:local
+    container_name: foregamer_api
+    env_file:
+      - ./App/.env                  
     ports:
-      - "8000:8000"
-    environment:
-      MONGO_URI: "mongodb://mongo:27017"
-      FAISS_PATH: "/data/index.faiss"
-    depends_on:
-      - mongo
+      - "8000:8000"             
     volumes:
-      - .:/app
+      - ./App:/app/App         
+      - ./App/Data:/app/App/Data  
+    depends_on:
+      mongo:
+        condition: service_healthy
+    
+    command: uvicorn App.main:app --host 0.0.0.0 --port 8000 --reload
 
   mongo:
-    image: mongo:6
-    container_name: mongo-db
+    image: mongo:6.0
+    container_name: foregamer_mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-npc_system_db}
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
-  mongo-data:
+  mongo_data:
