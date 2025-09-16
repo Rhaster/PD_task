@@ -100,28 +100,36 @@ docker run --env-file .env -p 8000:8000 npc-system:latest
 ### Z docker-compose
 
 ```yaml
-version: '3.9'
-
 services:
   mongo:
-    image: mongo:7
+    image: mongo:6.0
     container_name: npc_mongo
+    restart: unless-stopped
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_DATABASE: npc_system_db
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: npc_app
     env_file:
       - .env
     ports:
       - "8000:8000"
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+    command: uvicorn App.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   mongo_data:
@@ -233,7 +241,7 @@ uvicorn main:app --reload
 
 2. Logi aplikacji zapisują się w konsoli – używaj `logging_function` w kodzie.
 
-3. Testy uruchamiaj przez pytest:
+3. Testy uruchamiaj przez pytest(moze byc konieczna zmiana sciezki):
 
 ```bash
 pytest tests/
