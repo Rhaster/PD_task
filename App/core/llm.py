@@ -1,4 +1,12 @@
 # core/llm.py
+# LLM interaction using Groq API with session management in MongoDB.
+# Supports chat completions with JSON responses and error handling.
+# Caches API key and client instance for efficiency.
+# Provides functions to get and save chat messages in a session.
+# Loads environment variables from .env if available.
+# Handles missing API key with clear error messages.
+# Uses Groq's chat completion with a specified model and response format.
+# Retries on JSON decode errors with user prompt to return valid JSON only.
 from __future__ import annotations
 import os, json, time
 from typing import Any, Dict, Optional
@@ -8,18 +16,15 @@ from datetime import datetime
 import json, time
 from db.database import sessions
 
-# 1) wczytaj .env (jeśli istnieje)
 try:
     from dotenv import load_dotenv, find_dotenv
-    _env_path = find_dotenv()  # znajdzie najbliższy .env w górę katalogów
+    _env_path = find_dotenv()  
     if _env_path:
         load_dotenv(_env_path, override=False)
 except Exception:
-    # brak python-dotenv lub .env – to nie blokuje, jedynie info
     _env_path = None
 
 def _get_env_key() -> Optional[str]:
-    # 2) spróbuj różnych nazw; czasem ktoś używa innej
     key = (
         os.getenv("GROQ_API_KEY")
         or os.getenv("GROQ_APIKEY")
@@ -28,7 +33,6 @@ def _get_env_key() -> Optional[str]:
     )
     if not key:
         return None
-    # 3) utnij przypadkowe cudzysłowy z .env (np. GROQ_API_KEY="sk-xxx")
     key = key.strip().strip("'").strip('"')
     return key or None
 
@@ -42,7 +46,6 @@ def _get_client() -> Groq:
     global _client, _api_key_cache
     if _client is not None:
         return _client
-
     api_key = _get_env_key()
     if not api_key:
         # zbuduj czytelny komunikat diagnostyczny
@@ -57,10 +60,7 @@ def _get_client() -> Groq:
     return _client
 
 
-
-
 def get_session(session_id: str) -> dict:
-    """Pobiera sesję z MongoDB albo tworzy nową."""
     session = sessions.find_one({"session_id": session_id})
     if not session:
         session = {
@@ -74,7 +74,6 @@ def get_session(session_id: str) -> dict:
 
 
 def save_message(session_id: str, role: str, content: str):
-    """Dodaje wiadomość do historii w MongoDB."""
     sessions.update_one(
         {"session_id": session_id},
         {
@@ -96,7 +95,6 @@ def chat_json(
     client = _get_client()  # Twój kod z Groq
     session = get_session(session_id)
 
-    # budowanie kontekstu z historii
     messages = [{"role": "system", "content": system}]
     messages.extend(session["messages"])
     messages.append({"role": "user", "content": user})

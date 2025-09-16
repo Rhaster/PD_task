@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Foregamer NPC Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1e1e1e; color: #f1f1f1; font-family: Arial, sans-serif; }
+        .container { display: flex; height: 90vh; margin-top: 20px; }
+        .left-panel, .right-panel { flex: 1; padding: 20px; overflow-y: auto; }
+        .left-panel { border-right: 1px solid #444; }
+        .right-panel { display: flex; flex-direction: column; }
+        .chat-box { flex: 1; background-color: #2b2b2b; padding: 10px; border-radius: 5px; overflow-y: auto; margin-bottom: 10px; }
+        .chat-message { margin-bottom: 10px; }
+        .chat-message.user { text-align: right; color: #0dcaf0; }
+        .chat-message.bot { text-align: left; color: #f1f1f1; }
+        textarea { width: 100%; resize: none; background-color: #2b2b2b; border: 1px solid #444; color: #f1f1f1; padding: 10px; border-radius: 5px; }
+        button { margin-top: 5px; }
+        pre { background-color: #2b2b2b; padding: 10px; border-radius: 5px; overflow-x: auto; color: #f1f1f1; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="left-panel">
+    <h4>Lista NPC w bazie:</h4>
+    <div id="npc-list" style="max-height: 80vh; overflow-y: auto; border: 1px solid #444; padding: 5px; border-radius: 5px;">
+        {% for name in npc_names %}
+            <div class="npc-item" style="padding: 5px; border-bottom: 1px solid #555;">{{ name }}</div>
+        {% endfor %}
+    </div>
+</div>
+
+    <div class="right-panel">
+        <div class="chat-box" id="chat-box"></div>
+        <textarea id="user-input" rows="3" placeholder="Napisz wiadomość..."></textarea>
+        <button id="send-btn" class="btn btn-primary">Wyślij</button>
+        <button id="reset-btn" class="btn btn-secondary">Resetuj chat</button>
+
+          <input type="file" id="fantasy-file" accept=".md" class="form-control mb-2">
+        <button id="upload-story" class="btn btn-success mb-3">Podmień fantasy.md</button>
+        <button id="run-faiss" class="btn btn-warning mb-3">Uruchom faiss_converter.py</button>
+        <h5 class="mt-3">Konfiguracja .env:</h5>
+        <pre id="env-config">
+APP_ENV={{ env.APP_ENV }}
+GROQ_API_KEY={{ env.GROQ_API_KEY }}
+GROQ_BASE_URL={{ env.GROQ_BASE_URL }}
+GROQ_MODEL={{ env.GROQ_MODEL }}
+MONGO_URI={{ env.MONGO_URI }}
+MONGO_DB={{ env.MONGO_DB }}
+        </pre>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    function appendMessage(sender, text) {
+        const box = $("#chat-box");
+        box.append(`<div class="chat-message ${sender}">${text}</div>`);
+        box.scrollTop(box[0].scrollHeight);
+    }
+
+    async function refreshNPCs() {
+    try {
+        const res = await fetch("/npcs");
+        const data = await res.json();
+        const list = $("#npc-list");
+        list.empty();
+        data.npc_names.forEach(name => {
+            list.append(`<div class="npc-item" style="padding: 5px; border-bottom: 1px solid #555;">${name}</div>`);
+        });
+    } catch (err) {
+        console.error("Błąd odświeżania NPC:", err);
+    }
+}
+setInterval(refreshNPCs, 10000); // odświeżanie co 10 sekund
+
+
+    $("#send-btn").click(function() {
+        const prompt = $("#user-input").val();
+        if (!prompt) return;
+        appendMessage("user", prompt);
+        $("#user-input").val("");
+        $.post("/chat", {prompt: prompt}, function(data) {
+            if (data.error) appendMessage("bot", "Błąd: " + data.error);
+            else appendMessage("bot", data.response || JSON.stringify(data));
+        });
+    });
+
+    $("#reset-btn").click(function() {
+        $.post("/reset_chat", {}, function(data) {
+            $("#chat-box").html("");
+            appendMessage("bot", "Czat został zresetowany.");
+        });
+    });
+
+    // Odświeżanie listy NPC co 5 sekund
+    setInterval(refreshNPCs, 10000);
+     $("#upload-story").click(function() {
+        const fileInput = $("#fantasy-file")[0];
+        if (!fileInput.files.length) {
+            alert("Wybierz plik .md do przesłania!");
+            return;
+        }
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        fetch("/upload_story", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => alert(data.status || "Plik przesłany"))
+        .catch(err => alert("Błąd przesyłania: " + err));
+    });
+
+    // Uruchamianie skryptu faiss_converter.py
+    $("#run-faiss").click(function() {
+        fetch("/run_faiss", { method: "POST" })
+        .then(res => res.json())
+        .then(data => alert(data.status || "Skrypt uruchomiony"))
+        .catch(err => alert("Błąd uruchamiania: " + err));
+    });
+</script>
+</body>
+</html>

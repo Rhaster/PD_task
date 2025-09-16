@@ -1,3 +1,10 @@
+# scripts/faiss_converter.py
+# Script to build a FAISS index from a markdown story file using local embeddings.
+# saves index and metadata to specified paths.
+# Also includes a quick search function for testing the index.
+
+
+
 from __future__ import annotations
 from pathlib import Path
 import re
@@ -8,26 +15,18 @@ from typing import List, Dict, Tuple
 import numpy as np
 import faiss
 
-# lokalne embeddingi – możesz podmienić na inne
 from sentence_transformers import SentenceTransformer
 _model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")  # 384D
+#
 
 
-# ----------------------------
-# Embedding
-# ----------------------------
 def embed_texts(texts: List[str]) -> List[List[float]]:
     vecs = _model.encode(texts, normalize_embeddings=True)
     return vecs.tolist()
 
-
-# ----------------------------
-# Prosty chunker Markdown/Text
-# ----------------------------
 _HEADING_RE = re.compile(r"^(#{1,6})\s+.+$", flags=re.MULTILINE)
 
 def _split_by_headings(md: str) -> List[str]:
-    """Dzieli tekst na sekcje po nagłówkach; jeśli brak nagłówków, zwraca cały tekst."""
     if not _HEADING_RE.search(md):
         return [md]
     parts = []
@@ -42,7 +41,18 @@ def _split_by_headings(md: str) -> List[str]:
 
 
 def _word_chunks(text: str, chunk_words: int, overlap_words: int) -> List[str]:
-    """Tnie pojedynczy blok po liczbie słów z nadkładką."""
+    """
+        Divide a text block into smaller chunks of words with overlap.
+
+        Args:
+            text (str): Input text to split.
+            chunk_words (int): Number of words per chunk.
+            overlap_words (int): Number of overlapping words between consecutive chunks.
+
+        Returns:
+            List[str]: List of word chunks as strings.
+        
+    """
     words = text.split()
     if not words:
         return []
