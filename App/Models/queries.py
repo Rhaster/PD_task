@@ -1,15 +1,13 @@
-# Models/queries.py
-# Pydantic models for QA system requests and responses.
-# Defines the structure and validation for QA data.
-# Includes request and response models for API interactions.
-
+""" Pydantic models for query requests and responses. """
 from pydantic import BaseModel
 
 
 class QARequest(BaseModel):
+    """Schema for question-answering requests."""
     question: str
 
 
 class QAResponse(BaseModel):
+    """Schema for question-answering responses."""
     answer: str
     sources: list[str]

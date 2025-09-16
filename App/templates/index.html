@@ -14,6 +14,10 @@
         .chat-message { margin-bottom: 10px; }
         .chat-message.user { text-align: right; color: #0dcaf0; }
         .chat-message.bot { text-align: left; color: #f1f1f1; }
+        .console-box { flex: 0.5; background-color: #1a1a1a; padding: 10px; border-radius: 5px; overflow-y: auto; margin-top: 10px; font-size: 0.9em; color: #0dcaf0; font-family: monospace; }
+        .console-info { color: #0dcaf0; }    
+        .console-warn { color: #ffc107; }   
+        .console-error { color: #ff4d4d; }   
         textarea { width: 100%; resize: none; background-color: #2b2b2b; border: 1px solid #444; color: #f1f1f1; padding: 10px; border-radius: 5px; }
         button { margin-top: 5px; }
         pre { background-color: #2b2b2b; padding: 10px; border-radius: 5px; overflow-x: auto; color: #f1f1f1; }
@@ -22,24 +26,28 @@
 <body>
 <div class="container">
     <div class="left-panel">
-    <h4>Lista NPC w bazie:</h4>
-    <div id="npc-list" style="max-height: 80vh; overflow-y: auto; border: 1px solid #444; padding: 5px; border-radius: 5px;">
-        {% for name in npc_names %}
-            <div class="npc-item" style="padding: 5px; border-bottom: 1px solid #555;">{{ name }}</div>
-        {% endfor %}
+        <h4>NPC list in database:</h4>
+        <div id="npc-list" style="max-height: 80vh; overflow-y: auto; border: 1px solid #444; padding: 5px; border-radius: 5px;">
+            {% for name in npc_names %}
+                <div class="npc-item" style="padding: 5px; border-bottom: 1px solid #555;">{{ name }}</div>
+            {% endfor %}
+        </div>
     </div>
-</div>
 
     <div class="right-panel">
         <div class="chat-box" id="chat-box"></div>
-        <textarea id="user-input" rows="3" placeholder="Napisz wiadomość..."></textarea>
-        <button id="send-btn" class="btn btn-primary">Wyślij</button>
-        <button id="reset-btn" class="btn btn-secondary">Resetuj chat</button>
+        <textarea id="user-input" rows="3" placeholder="Write input"></textarea>
+        <button id="send-btn" class="btn btn-primary">Send</button>
+        <button id="reset-btn" class="btn btn-secondary">Reset</button>
 
-          <input type="file" id="fantasy-file" accept=".md" class="form-control mb-2">
-        <button id="upload-story" class="btn btn-success mb-3">Podmień fantasy.md</button>
-        <button id="run-faiss" class="btn btn-warning mb-3">Uruchom faiss_converter.py</button>
-        <h5 class="mt-3">Konfiguracja .env:</h5>
+        <input type="file" id="fantasy-file" accept=".md" class="form-control mb-2">
+        <button id="upload-story" class="btn btn-success mb-3">Change story</button>
+        <button id="run-faiss" class="btn btn-warning mb-3">Run story conversion</button>
+
+        <h5 class="mt-3">Console / Debug Logs:</h5>
+        <div class="console-box" id="console-box"></div>
+
+        <h5 class="mt-3">.env configuration:</h5>
         <pre id="env-config">
 APP_ENV={{ env.APP_ENV }}
 GROQ_API_KEY={{ env.GROQ_API_KEY }}
@@ -53,72 +61,132 @@ MONGO_DB={{ env.MONGO_DB }}
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    function appendMessage(sender, text) {
-        const box = $("#chat-box");
-        box.append(`<div class="chat-message ${sender}">${text}</div>`);
-        box.scrollTop(box[0].scrollHeight);
+    
+    function logToConsole(msg, type="info") {
+        const consoleDiv = $("#console-box");
+        const cssClass = type === "warn" ? "console-warn" : type === "error" ? "console-error" : "console-info";
+        const newMsg = `<div class="${cssClass}">[${type.toUpperCase()}] ${msg}</div>`;
+        consoleDiv.append(newMsg);
+        consoleDiv.scrollTop(consoleDiv[0].scrollHeight);
     }
+
 
     async function refreshNPCs() {
     try {
-        const res = await fetch("/npcs");
+        logToConsole("Refreshing NPC list...", "info");
+        const res = await fetch("/api/v1/npcs");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const list = $("#npc-list");
         list.empty();
         data.npc_names.forEach(name => {
             list.append(`<div class="npc-item" style="padding: 5px; border-bottom: 1px solid #555;">${name}</div>`);
         });
+        logToConsole("NPC list updated.", "info");
     } catch (err) {
-        console.error("Błąd odświeżania NPC:", err);
+        logToConsole("Error while refreshing NPC list: " + err, "error");
+    } finally {
+        setTimeout(refreshNPCs, 30000);
     }
 }
-setInterval(refreshNPCs, 10000); // odświeżanie co 10 sekund
 
+
+refreshNPCs();
+
+    function appendMessage(sender, text) {
+        const box = $("#chat-box");
+        box.append(`<div class="chat-message ${sender}">${text}</div>`);
+        box.scrollTop(box[0].scrollHeight);
+    }
+
+    refreshNPCs();
 
     $("#send-btn").click(function() {
         const prompt = $("#user-input").val();
         if (!prompt) return;
         appendMessage("user", prompt);
+        logToConsole("User input: " + prompt, "info");
         $("#user-input").val("");
-        $.post("/chat", {prompt: prompt}, function(data) {
-            if (data.error) appendMessage("bot", "Błąd: " + data.error);
-            else appendMessage("bot", data.response || JSON.stringify(data));
-        });
+
+        $.post("/api/v1/chat", {prompt: prompt})
+            .done(function(data) {
+                if (data.error) {
+                    appendMessage("bot", "Error: " + data.error);
+                    logToConsole("Bot error: " + data.error, "error");
+                } else if (data.detail) {
+                    appendMessage("bot", "Error: " + data.detail);
+                    logToConsole("Bot error: " + data.detail, "error");
+                } else {
+                    appendMessage("bot", data.response || JSON.stringify(data));
+                    logToConsole("Bot response: " + (data.response || JSON.stringify(data)), "info");
+                }
+            })
+            .fail(function(xhr) {
+                let msg = "Unknown error";
+                try {
+                    const resp = JSON.parse(xhr.responseText);
+                    if (resp.detail) msg = resp.detail;
+                    else if (resp.error && resp.error.message) {
+                        msg = resp.error.message;
+                        if (resp.error.code === "json_validate_failed") {
+                            msg += " (API limit reached)";
+                        }
+                    }
+                } catch(e) {}
+                appendMessage("bot", "Error: " + msg);
+                logToConsole("AJAX fail: " + msg, "error");
+            });
     });
 
+  
     $("#reset-btn").click(function() {
-        $.post("/reset_chat", {}, function(data) {
+        $.post("/api/v1/reset_chat", {}, function(data) {
             $("#chat-box").html("");
-            appendMessage("bot", "Czat został zresetowany.");
+            appendMessage("bot", "Cleared.");
+            logToConsole("Chat reset.", "info");
         });
     });
 
-    // Odświeżanie listy NPC co 5 sekund
-    setInterval(refreshNPCs, 10000);
-     $("#upload-story").click(function() {
+
+    $("#upload-story").click(function() {
         const fileInput = $("#fantasy-file")[0];
         if (!fileInput.files.length) {
-            alert("Wybierz plik .md do przesłania!");
+            alert("Choose a .md file first");
             return;
         }
         const formData = new FormData();
         formData.append("file", fileInput.files[0]);
 
-        fetch("/upload_story", {
+        fetch("/api/v1/upload_story", {
             method: "POST",
             body: formData
         })
         .then(res => res.json())
-        .then(data => alert(data.status || "Plik przesłany"))
-        .catch(err => alert("Błąd przesyłania: " + err));
+        .then(data => {
+            alert(data.status || "File uploaded");
+            logToConsole("Story uploaded: " + JSON.stringify(data), "info");
+        })
+        .catch(err => {
+            alert("Upload error: " + err);
+            logToConsole("Upload error: " + err, "error");
+        });
     });
 
-    // Uruchamianie skryptu faiss_converter.py
     $("#run-faiss").click(function() {
-        fetch("/run_faiss", { method: "POST" })
+        fetch("/api/v1/faiss/run_faiss", { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ story_path: "App/Data/fantasy.md" })
+        })
         .then(res => res.json())
-        .then(data => alert(data.status || "Skrypt uruchomiony"))
-        .catch(err => alert("Błąd uruchamiania: " + err));
+        .then(data => {
+            alert("Faiss conversion started: " + JSON.stringify(data));
+            logToConsole("Faiss run: " + JSON.stringify(data), "info");
+        })
+        .catch(err => {
+            alert("Error: " + err);
+            logToConsole("Faiss error: " + err, "error");
+        });
     });
 </script>
 </body>

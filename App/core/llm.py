@@ -1,66 +1,44 @@
-# core/llm.py
-# LLM interaction using Groq API with session management in MongoDB.
-# Supports chat completions with JSON responses and error handling.
-# Caches API key and client instance for efficiency.
-# Provides functions to get and save chat messages in a session.
-# Loads environment variables from .env if available.
-# Handles missing API key with clear error messages.
-# Uses Groq's chat completion with a specified model and response format.
-# Retries on JSON decode errors with user prompt to return valid JSON only.
+"""Groq LLM client and session utilities.
+
+This module wraps API-key discovery, a lazily initialized Groq client, basic
+session persistence in MongoDB, and a helper ``chat_json`` that requests a
+JSON-formatted response with retries.
+"""
 from __future__ import annotations
-import os, json, time
-from typing import Any, Dict, Optional
+import  json, time
+from typing import Optional
 from groq import Groq
-from pymongo import MongoClient
 from datetime import datetime
 import json, time
-from db.database import sessions
+from App.Config.database import sessions
+from App.Config.config import settings
 
-try:
-    from dotenv import load_dotenv, find_dotenv
-    _env_path = find_dotenv()  
-    if _env_path:
-        load_dotenv(_env_path, override=False)
-except Exception:
-    _env_path = None
 
-def _get_env_key() -> Optional[str]:
-    key = (
-        os.getenv("GROQ_API_KEY")
-        or os.getenv("GROQ_APIKEY")
-        or os.getenv("GROQ_TOKEN")
-        or os.getenv("GROQ_KEY")
-    )
-    if not key:
-        return None
-    key = key.strip().strip("'").strip('"')
-    return key or None
 
-CHAT_MODEL = os.getenv("CHAT_MODEL", "openai/gpt-oss-20b")
+
+CHAT_MODEL = settings.groq_model
 class LLMError(RuntimeError):
     pass
 _client: Optional[Groq] = None
 _api_key_cache: Optional[str] = None
 
 def _get_client() -> Groq:
+    """Return a cached Groq client, initializing it on first use."""
     global _client, _api_key_cache
     if _client is not None:
         return _client
-    api_key = _get_env_key()
+    api_key = settings.groq_api_key
     if not api_key:
-        # zbuduj czytelny komunikat diagnostyczny
-        where = f".env: {_env_path}" if _env_path else "(.env nie znaleziono)"
-        tried = "GROQ_API_KEY / GROQ_APIKEY / GROQ_TOKEN / GROQ_KEY"
         raise LLMError(
-            f"Missing Groq API key in env ({where})"
+            f"Missing Groq API key"
         )
-
     _api_key_cache = api_key
     _client = Groq(api_key=api_key)
     return _client
 
 
 def get_session(session_id: str) -> dict:
+    """Fetch or create a session document for the given ``session_id``."""
     session = sessions.find_one({"session_id": session_id})
     if not session:
         session = {
@@ -74,6 +52,7 @@ def get_session(session_id: str) -> dict:
 
 
 def save_message(session_id: str, role: str, content: str):
+    """Append a chat message to the session and bump ``updated_at``."""
     sessions.update_one(
         {"session_id": session_id},
         {
@@ -89,10 +68,11 @@ def chat_json(
     session_id: str,
     *,
     temperature: float = 0.2,
-    max_tokens: int = 1000,
+    max_tokens: int = 2000,
     max_retries: int = 2,
 ):
-    client = _get_client()  # Twój kod z Groq
+    """ Send a chat request and parse the JSON response."""
+    client = _get_client()
     session = get_session(session_id)
 
     messages = [{"role": "system", "content": system}]
@@ -111,8 +91,8 @@ def chat_json(
         content = (resp.choices[0].message.content or "").strip()
         try:
             parsed = json.loads(content)
-
-            # zapisz wiadomości do historii
+            print("Prompt:", user)
+            print("content", content)
             save_message(session_id, "user", user)
             save_message(session_id, "assistant", content)
 
@@ -123,6 +103,6 @@ def chat_json(
                 "role": "user",
                 "content": "Return ONLY valid JSON. No prose, no code fences."
             })
-            time.sleep(0.2)
+            time.sleep(10)
 
-    raise LLMError(f"Model nie zwrócił poprawnego JSON po retry: {last_err}")
+    raise LLMError(f"Model did not return valid JSON after retries: {last_err}")
