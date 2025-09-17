@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import sys
 from pathlib import Path
 from fastapi.testclient import TestClient
-
+from App.Config.paths import get_data_dir
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -66,24 +66,18 @@ def test_reset_chat_calls_context_cache_clear(monkeypatch):
     assert r.json() == {"status": "ok"}
 
 
-def test_upload_story_saves_file(tmp_path):
-    """ Test the /upload_story endpoint saves the uploaded file correctly."""
-    cwd = os.getcwd()
-    os.chdir(tmp_path)
-    try:
-       
-        os.makedirs("Data", exist_ok=True)
-        file_content = b"# Story \n this is test."
-        files = {"file": ("test.md", io.BytesIO(file_content), "text/markdown")}
-        r = client.post("/upload_story", files=files)
-        assert r.status_code == 200
-        assert "File test.md saved  as fantasy.md" in r.json()["status"]
-     
-        assert (tmp_path / "Data" / "fantasy.md").exists()
-        assert (tmp_path / "Data" / "fantasy.md").read_bytes() == file_content
-    finally:
-        os.chdir(cwd)
 
+
+def test_upload_story_saves_file(client):
+    file_content = b"# Story \n this is test."
+    files = {"file": ("test.md", io.BytesIO(file_content), "text/markdown")}
+    r = client.post("/upload_story", files=files)
+    assert r.status_code == 200
+    assert "File test.md saved  as fantasy.md" in r.json()["status"]
+
+    dest = get_data_dir() / "fantasy.md"
+    assert dest.exists()
+    assert dest.read_bytes() == file_content
 
 def test_run_faiss_success(monkeypatch):
     """ Test the /faiss/run_faiss endpoint with a successful build_index call."""

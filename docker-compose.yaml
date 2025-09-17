@@ -1,30 +1,26 @@
-# docker-compose.yaml
 services:
   api:
     build:
       context: .
-      dockerfile: .dockerfile   
-    image: foregamer/api:local
-    container_name: foregamer_api
+      dockerfile: Dockerfile
+    container_name: Chatbot_npc_gen
     env_file:
-      - ./App/.env                  
+      - ./App/.env
     ports:
-      - "8000:8000"             
+      - "8000:8000"
     volumes:
-      - ./App:/app/App         
-      - ./App/Data:/app/App/Data  
+      - ./App:/app/App
+      - ./App/Data:/app/App/Data
     depends_on:
-      mongo:
-        condition: service_healthy
-    
+      - mongo
     command: uvicorn App.main:app --host 0.0.0.0 --port 8000 --reload
 
   mongo:
     image: mongo:6.0
-    container_name: foregamer_mongo
+    container_name: mongo
     restart: unless-stopped
     environment:
-      MONGO_INITDB_DATABASE: ${MONGO_DB:-npc_system_db}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-npcdb}
     ports:
       - "27017:27017"
     volumes:
@@ -36,4 +32,4 @@ services:
       retries: 10
 
 volumes:
-  mongo_data:
+  mongo_data: {}

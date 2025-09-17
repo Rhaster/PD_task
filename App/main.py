@@ -27,7 +27,7 @@ from App.Config.database import npc_collection
 from App.Config.config import settings
 from App.Services.utility import setup_logging, logging_function
 from pathlib import Path
-
+from App.Config.paths import get_data_dir
 setup_logging()
 
 
@@ -39,7 +39,8 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8000"],  
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -109,17 +110,17 @@ def get_npcs():
     return JSONResponse(content={"npc_names": npc_names})
 
 
-
 @app.post("/upload_story")
 async def upload_story(file: UploadFile = File(...)):
-    """Persist an uploaded markdown file as ``Data/fantasy.md``.
+    """Persist an uploaded markdown file as ``App/Data/fantasy.md``."""
+    dest_dir = get_data_dir()
+    dest_dir.mkdir(parents=True, exist_ok=True)  # na wszelki wypadek
+    dest = dest_dir / "fantasy.md"
 
-    The saved file is later used by the FAISS builder to re-index the corpus.
-    """
-    path = "App/Data/fantasy.md"
-    with open(path, "wb") as f:
+    with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
-    return {"status": f"File {file.filename} saved  as fantasy.md"}
+
+    return {"status": f"File {file.filename} saved  as {dest.name}"}
 
 
 

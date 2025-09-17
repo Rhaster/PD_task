@@ -16,7 +16,7 @@ from groq import BadRequestError
 import logging
 from App.Core.prompts import CLASSIFICATION_SYSTEM
 from App.Services.utility import handle_bad_request_error
-
+import re
 
 
 class GeneralPipeline:
@@ -26,12 +26,25 @@ class GeneralPipeline:
         """Initialize sub-pipelines, sharing a FAISS-backed RAG store."""
         self.npc_pipeline = NPCPipeline(FaissRAG(index_path=settings.faiss_path))
         self.qa_pipeline = QAPipeline(FaissRAG(index_path=settings.faiss_path))  
+    def sanitize_query(self, query: str) -> str:
+        """Check prompt for forbitten content"""
+        if not isinstance(query, str):
+            return ""
+        query = query.strip()[:2000]
+        query = re.sub(r"(?:<\s*/?\s*system\s*>|\bSYSTEM:)", "", query, flags=re.IGNORECASE)
+        return query
+
     def process(self, query: str):
         """Classify ``query`` and dispatch to the appropriate pipeline."""
         logging_function(f"Processing query: {query} ", level="info")
 
-        
-       
+        query = self.sanitize_query(query)
+        if not query.strip():
+                logging_function("Empty query received, returning safe fallback", level="warning")
+                return {
+                "status": "error",
+                "message": "Your query was empty. Please provide a valid question or prompt."
+                }
         classification_prompt = CLASSIFICATION_SYSTEM + f"\n:\n{query}\n\nRespond with JSON."
 
         cls_result = "QA"  

@@ -1,8 +1,8 @@
 """ Prompts for various tasks like QA and NPC generation and classification. """
 
 QA_SYSTEM = (
-    "You are a lore expert. Answer ONLY from CONTEXT or previous conversation "
-    "If unknown, say 'I don't know'. Cite chunk_ids in 'sources'."
+    "You are a lore expert. Answer ONLY from CONTEXT or  previous conversation "
+    "If unknown, say 'I don't know, can you specify?'. Cite chunk_ids in 'sources'."
 )
 
 QA_USER_TEMPLATE = (
@@ -25,10 +25,10 @@ NPC_USER_TEMPLATE = (
 CLASSIFICATION_SYSTEM = """
         Decide if the following user query is asking to GENERATE NPC or is a QA question.
         Respond ONLY with a JSON object containing a single key 'type' with value 'NPC' or 'QA'. 
-        Or 'NONE' if you can't specify, add olso key 'amount' if you can specify the amount of NPCs to generate from user prompt.  
+        Or 'NONE' if you can't specify, add olso key 'amount' if you can specify the amount of NPCs to generate from user prompt, it cannot be negative or 0, default 1.  
         Query: 
         """
 SUMMARY_SYSTEM = (
-    "You are a helpful assistant that summarizes previous Q&A pairs into a concise summary. "
+    "You are a helpful assistant that summarizes previous Q&A pairs into a concise summary keep all proper nouns (names, factions, places). "
                "Return the result as a JSON object: {\"summary\": \"...\"} ")
 

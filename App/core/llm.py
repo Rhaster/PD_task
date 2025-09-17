@@ -39,7 +39,10 @@ def _get_client() -> Groq:
 
 def get_session(session_id: str) -> dict:
     """Fetch or create a session document for the given ``session_id``."""
-    session = sessions.find_one({"session_id": session_id})
+    session = sessions.find_one(
+    {"session_id": session_id},
+    {"messages": {"$slice": -10}, "session_id": 1, "created_at": 1, "updated_at": 1}
+    )
     if not session:
         session = {
             "session_id": session_id,
@@ -62,47 +65,57 @@ def save_message(session_id: str, role: str, content: str):
     )
 
 
+from groq import BadRequestError, APIStatusError, APITimeoutError
+import logging
+
 def chat_json(
     system: str,
     user: str,
     session_id: str,
     *,
-    temperature: float = 0.2,
+    temperature: float = 0.1,
     max_tokens: int = 2000,
     max_retries: int = 2,
+    force_object: bool = True
 ):
-    """ Send a chat request and parse the JSON response."""
     client = _get_client()
     session = get_session(session_id)
-
     messages = [{"role": "system", "content": system}]
     messages.extend(session["messages"])
     messages.append({"role": "user", "content": user})
-
     last_err = None
-    for _ in range(max_retries + 1):
-        resp = client.chat.completions.create(
-            model=CHAT_MODEL,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-        )
-        content = (resp.choices[0].message.content or "").strip()
+    if(force_object == True):
+        json_type = {"type": "json_object"}
+    else: 
+        json_type =  {"type": "text"}
+    for attempt in range(max_retries + 1):
         try:
+            resp = client.chat.completions.create(
+                model=CHAT_MODEL,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format=json_type,
+            )
+            content = (resp.choices[0].message.content or "").strip()
             parsed = json.loads(content)
-            print("Prompt:", user)
-            print("content", content)
+            logging.debug("Prompt: %s", user)
+            logging.debug("Content: %s", content)
             save_message(session_id, "user", user)
             save_message(session_id, "assistant", content)
-
             return parsed
+
+        except (BadRequestError, APIStatusError, APITimeoutError) as e:
+            last_err = e
+            logging.warning(f"Groq API error on attempt {attempt+1}: {e}")
+            time.sleep(2 ** attempt)  # exponential backoff
         except json.JSONDecodeError as e:
             last_err = e
+            logging.warning(f"Invalid JSON on attempt {attempt+1}, retrying...")
             messages.append({
                 "role": "user",
                 "content": "Return ONLY valid JSON. No prose, no code fences."
             })
-            time.sleep(10)
+            time.sleep(2 ** attempt)
 
-    raise LLMError(f"Model did not return valid JSON after retries: {last_err}")
+    raise LLMError(f"Groq API failed after {max_retries+1} attempts: {last_err}")

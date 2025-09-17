@@ -10,7 +10,8 @@ def setup_logging(level: int | None = None) -> None:
     """
     logging.getLogger("pymongo").setLevel(logging.WARNING)
     logging.basicConfig(level=level or logging.DEBUG)
-
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 def logging_function(message: str, level: str = "info") -> None:
     """Unified logging entry used across the project.
