@@ -1,6 +1,6 @@
 # NPC Generation System
 
-System czatbota z interfejsem API, który odpowiada na pytania kontekstowe z podanej historii i generuje unikalne postacie NPC. Kontekst pozyskuje przez RAG (FAISS jako wektorowy magazyn), odpowiedzi tworzy LLM via Groq, a dane i sesje przechowuje w MongoDB.
+System czatbota z interfejsem API, który odpowiada na pytania kontekstowe z podanej historii i generuje unikalne postacie NPC. Kontekst pozyskuje przez RAG (FAISS jako wektorowy magazyn), odpowiedzi tworzy LLM via Groq, a dane i sesje przechowuje w MongoDB. System posiada równiez warstwę frontendową do interakcji z uzytkownikiem.
 ---
 
 ## Spis treści
@@ -77,7 +77,7 @@ FAISS_META_PATH=App/Data/index.faiss.meta.jsonl
 
 1. Zainstaluj zależności:
 
-Przejdz do folderu /Foregamer_task
+Przejdz do folderu głownego
 ```bash
 pip install -r requirements.txt
 ```
